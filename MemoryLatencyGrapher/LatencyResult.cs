@@ -1,6 +1,6 @@
 ﻿namespace MemoryLatencyGrapher;
 
-public sealed record LatencyResult(long MemorySizeInBytes, double latency_ns, double latency_stderr_ns, int TrialCount)
+public sealed record LatencyResult(long MemorySizeInBytes, double latency_ns, double latency_stderr_ns, double TrialCount)
 {
     public double X
         => MemorySizeInBytes;

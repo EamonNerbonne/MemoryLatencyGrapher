@@ -35,23 +35,28 @@ Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
 var length = 1;
 long idx = 0;
-RunTest(length, sw, arr, ref idx); //precompile
-var totalIters = 0;
-for (var target = Math.Max(1L << shift, 256); target < maxLong; target += target >> shift) {
-    totalIters++;
+_ = RunTest(length, sw, arr, idx);
+IEnumerable<long> ArraySizes() {
+    for (var target = Math.Max(1L << shift, 256); target < maxLong; target += target >> shift) {
+        yield return target;
+    }
 }
-var currentIter = 0;
-for (var target = Math.Max(1L << shift, 256); target < maxLong; target += target >> shift) {
+var arraySizes = ArraySizes().ToArray();
+
+
+for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
+    var target = arraySizes[currentIter];
     for (; length < target; length++) {
         var swapWith = rnd.Next(length);
         arr[length] = arr[swapWith];
         arr[swapWith] = length;
     }
-    var result = RunTest(length, sw, arr, ref idx);
+    var (memLatencyNs, nextIdx) = RunTest(length, sw, arr, idx);
+    idx = nextIdx;
+    var result = new LatencyResult(length * sizeof(long), memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
     results.Add(result);
-    currentIter++;
 
-    Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     ({currentIter * 100.0 / totalIters:f1}% of test run complete)");
+    Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     ({currentIter * 100.0 / arraySizes.Length:f1}% of test run complete)");
 }
 
 var Ymax = results.Select(r => r.Y_plus2stderr).Max();
@@ -82,14 +87,12 @@ using var jsonStream = File.OpenWrite(basename + ".json");
 JsonSerializer.Serialize(jsonStream, results.ToArray(), ResultJsonSerializerContext.Default.LatencyResultArray);
 return;
 
-static LatencyResult RunTest(int length, Stopwatch sw, long[] arr, ref long globalIdx)
+static (MeanVarianceAccumulator memLatencyNs, long idx) RunTest(int length, Stopwatch sw, long[] arr, long idx)
 {
-    var idx = globalIdx;
     var memLatencyNs = MeanVarianceAccumulator.Empty;
     var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(maxLong) - Math.Log(length)) * 20);
-    var testCount = 0;
-    while (testCount < maxTestingCountPerSize
-           && (testCount < netMinTestingCount
+    while (memLatencyNs.WeightSum < maxTestingCountPerSize
+           && (memLatencyNs.WeightSum < netMinTestingCount
                || RelativeError(memLatencyNs) >= target_relative_error
                || StdError(memLatencyNs) >= target_absolute_error)) {
         idx = arr[idx]; //avoid prefetching shenanigans
@@ -98,10 +101,8 @@ static LatencyResult RunTest(int length, Stopwatch sw, long[] arr, ref long glob
             idx = arr[idx];
         }
         memLatencyNs = memLatencyNs.Add(sw.Elapsed.TotalNanoseconds / innerLoopLength);
-        testCount++;
     }
-    globalIdx = idx;
-    return new(length * sizeof(long), memLatencyNs.Mean, StdError(memLatencyNs), testCount);
+    return (memLatencyNs, idx);
 }
 static double StdError(MeanVarianceAccumulator acc)
     => acc.SampleStandardDeviation / Math.Sqrt(acc.WeightSum);
