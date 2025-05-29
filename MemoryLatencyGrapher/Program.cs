@@ -12,7 +12,8 @@ const double targetRelativeError = 0.03;
 
 var options = LatencyTestOptions.ParseOptions();
 var timestampStr = DateTime.UtcNow.ToString("o").Replace(":", "_");
-var basename = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), $"latency_{timestampStr}");
+var basename = Path.Combine(Environment.CurrentDirectory, $"latency_{timestampStr}");
+Console.WriteLine($"Writing results to {basename}.log, {basename}.svg, and {basename}.json");
 using var writer = options.LogProgressToFile ? new StreamWriter(basename + ".log") : null;
 
 Console.WriteLine("Using options (provide a json file parameter to alter): " + JsonSerializer.Serialize(options, ResultJsonSerializerContext.Default.LatencyTestOptions));
