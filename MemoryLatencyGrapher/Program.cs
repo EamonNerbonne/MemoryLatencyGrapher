@@ -16,12 +16,13 @@ void Log(string msg)
 
 const long maxMemory = 1L << 30;
 const long maxLong = maxMemory >> 3; //longs are 2^3 bytes
-const int shift = 2; // x-axis granularity; 0 is just factors of two, 1 is very rough, 4 is pretty detailed, 6 is probably beyond reasonable.
+const int shift = 3; // x-axis granularity; 0 is just factors of two, 1 is very rough, 4 is pretty detailed, 6 is probably beyond reasonable.
 const int innerLoopLength = 30_000;
-const int maxTestingCountPerSize = 10_000;
-const int minTestingCountPerSize = 40;
-const double target_relative_error = 0.05; //0.002;
-const double target_absolute_error = 0.1; // 0.02;
+const int maxTestingCountPerSize = 1_000;
+const int minTestingCountPerSize = 10;
+const int outerLoopLength = 40; //how many times to run the inner loop before measuring the time
+const double target_relative_error = 0.15; //0.002;
+const double target_absolute_error = 0.4; // 0.02;
 
 var arr = new long[maxLong];
 var rnd = Random.Shared;
@@ -33,31 +34,44 @@ using (var proc = Process.GetCurrentProcess())
 
 Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
-var length = 1;
-long idx = 0;
-_ = RunTest(length, sw, arr, idx);
+
+_ = RunTest(1, sw, arr, 0);
 IEnumerable<long> ArraySizes() {
     for (var target = Math.Max(1L << shift, 256); target < maxLong; target += target >> shift) {
         yield return target;
     }
 }
 var arraySizes = ArraySizes().ToArray();
+var distributions = arraySizes.Select(_=>MeanVarianceAccumulator.Empty).ToArray();
 
+for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++) {
+    var length = 1;
+    long idx = 0;
+    arr[0] = 0;
+    for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
+        var target = arraySizes[currentIter];
+        for (; length < target; length++) {
+            var swapWith = rnd.Next(length);
+            arr[length] = arr[swapWith];
+            arr[swapWith] = length;
+        }
 
+        var (memLatencyNs, nextIdx) = RunTest((int)target, sw, arr, idx);
+        idx = nextIdx;
+        distributions[currentIter] = distributions[currentIter].Add(memLatencyNs);
+        var result = new LatencyResult(target * sizeof(long), memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
+        Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     ({(outerLoopIdx*arraySizes.Length + currentIter) * 100.0 / arraySizes.Length/outerLoopLength:f1}% of test run complete)");
+
+    }
+}
 for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
     var target = arraySizes[currentIter];
-    for (; length < target; length++) {
-        var swapWith = rnd.Next(length);
-        arr[length] = arr[swapWith];
-        arr[swapWith] = length;
-    }
-    var (memLatencyNs, nextIdx) = RunTest(length, sw, arr, idx);
-    idx = nextIdx;
-    var result = new LatencyResult(length * sizeof(long), memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
+    var memLatencyNs = distributions[currentIter];
+    var result = new LatencyResult(target * sizeof(long), memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
     results.Add(result);
-
-    Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     ({currentIter * 100.0 / arraySizes.Length:f1}% of test run complete)");
+    Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     (final result for this size)");
 }
+
 
 var Ymax = results.Select(r => r.Y_plus2stderr).Max();
 var Ymin = Math.Max(0.1, results.Select(r => r.Y_min2stderr).Min());
