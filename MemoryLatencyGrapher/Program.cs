@@ -74,7 +74,7 @@ for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++) {
         idx = nextIdx;
         distributions[currentIter] = distributions[currentIter].Add(memLatencyNs);
         var result = new LatencyResult(target * bytesPerPayload, memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
-        Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     ({(outerLoopIdx * arraySizes.Length + currentIter) * 100.0 / arraySizes.Length / outerLoopLength:f1}% of test run complete)");
+        Log($"{result.Summarize()}   ({(outerLoopIdx * arraySizes.Length + currentIter) * 100.0 / arraySizes.Length / outerLoopLength:f1}% of test run complete)");
     }
 }
 for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
@@ -82,7 +82,7 @@ for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
     var memLatencyNs = distributions[currentIter];
     var result = new LatencyResult(target * bytesPerPayload, memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
     results.Add(result);
-    Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     (final result for this size)");
+    Log($"{result.Summarize()}    (final result for this size)");
 }
 
 var Ymax = results.Select(r => r.Y_plus2stderr).Max();
