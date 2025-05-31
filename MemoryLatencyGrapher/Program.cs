@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using IncrementalMeanVarianceAccumulator;
 using MemoryLatencyGrapher;
@@ -15,11 +15,14 @@ const int maxTestingCountPerSize = 800;
 const int minTestingCountPerSize = 5;
 const int outerLoopLength = 20; //how many times to run the inner loop before measuring the time
 const double target_relative_error = 0.03;
-const double target_absolute_error = 2;
 
-unsafe {
+var overallTimer = Stopwatch.StartNew();
+
+unsafe
+{
     var runTimePayloadSize = sizeof(payload_64byte);
-    if (runTimePayloadSize != bytesPerPayload) {
+    if (runTimePayloadSize != bytesPerPayload)
+    {
         throw new($"Assumption violated; payload should be 64 bytes but is {runTimePayloadSize}");
     }
 }
@@ -34,23 +37,25 @@ void Log(string msg)
 }
 
 var arr = new payload_64byte[payloadCount];
-var rnd = Random.Shared;
-var sw = new Stopwatch();
 
-try {
+try
+{
     using (var proc = Process.GetCurrentProcess())
         proc.PriorityClass = ProcessPriorityClass.RealTime;
 
     Thread.CurrentThread.Priority = ThreadPriority.Highest;
-} catch (Exception e) {
+}
+catch (Exception e)
+{
     Log("Unable to raise process priority. You may get more accurate results if you run this with increased priviledges (i.e. sudo).  Detailed message:" + e.Message);
 }
 
-_ = RunTest(1, sw, arr, 0);
-IEnumerable<long> ArraySizes()
+
+IEnumerable<int> ArraySizes()
 {
-    for (var target = Math.Max(1L << shift, 2048 / bytesPerPayload); target < payloadCount; target += target >> shift) {
-        yield return target;
+    for (var target = Math.Max(1L << shift, 2048 / bytesPerPayload); target < payloadCount; target += target >> shift)
+    {
+        yield return (int)target;
     }
 }
 
@@ -58,26 +63,34 @@ var arraySizes = ArraySizes().ToArray();
 var distributions = arraySizes.Select(_ => MeanVarianceAccumulator.Empty).ToArray();
 var results = new List<LatencyResult>();
 
-for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++) {
-    var length = 1;
-    var idx = 0;
-    arr[0].i0 = 0;
-    for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
-        var target = arraySizes[currentIter];
-        for (; length < target; length++) {
-            var swapWith = rnd.Next(length);
-            arr[length].i0 = arr[swapWith].i0;
-            arr[swapWith].i0 = length;
-        }
+Log($"Initialization took {overallTimer.Elapsed.TotalSeconds} seconds");
+overallTimer.Restart();
 
-        var (memLatencyNs, nextIdx) = RunTest((int)target, sw, arr, idx);
+for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++)
+{
+    arr[0].i0 = 0;
+    ExtendRandomCycle(arr, 1, 10);
+    _ = RunTest(10, arr, 0);//pre-heat
+
+    arr[0].i0 = 0;
+    var idx = 0;
+    var length = 1;
+    for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++)
+    {
+        var targetLength = arraySizes[currentIter];
+        ExtendRandomCycle(arr, length, targetLength);
+        length = targetLength;
+
+        var (memLatencyNs, nextIdx) = RunTest(targetLength, arr, idx);
         idx = nextIdx;
         distributions[currentIter] = distributions[currentIter].Add(memLatencyNs);
-        var result = new LatencyResult(target * bytesPerPayload, memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
+        var result = new LatencyResult(targetLength * bytesPerPayload, memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
         Log($"{result.Summarize()}   ({(outerLoopIdx * arraySizes.Length + currentIter) * 100.0 / arraySizes.Length / outerLoopLength:f1}% of test run complete)");
     }
 }
-for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
+Log($"Benchmark took {overallTimer.Elapsed.TotalSeconds} seconds");
+for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++)
+{
     var target = arraySizes[currentIter];
     var memLatencyNs = distributions[currentIter];
     var result = new LatencyResult(target * bytesPerPayload, memLatencyNs.Mean, StdError(memLatencyNs), memLatencyNs.WeightSum);
@@ -113,22 +126,26 @@ using var jsonStream = File.OpenWrite(basename + ".json");
 JsonSerializer.Serialize(jsonStream, results.ToArray(), ResultJsonSerializerContext.Default.LatencyResultArray);
 return;
 
-[MethodImpl(MethodImplOptions.AggressiveOptimization|MethodImplOptions.NoInlining)]
-static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Stopwatch sw, payload_64byte[] arr, int init_idx)
+[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.NoInlining)]
+static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Span<payload_64byte> arr, int init_idx)
 {
     var memLatencyNs = MeanVarianceAccumulator.Empty;
-    var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(payloadCount) - Math.Log(length)) * 3);
-    var idx=init_idx;
+    var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(payloadCount) - Math.Log(length)) * 4);
+    var idx = init_idx;
+    var nsPerTickPerLoop = 1000_000_000.0 / ((double)innerLoopLength * Stopwatch.Frequency);
     while (memLatencyNs.WeightSum < maxTestingCountPerSize
            && (memLatencyNs.WeightSum < netMinTestingCount
-               || RelativeError(memLatencyNs) >= target_relative_error
-               || StdError(memLatencyNs) >= target_absolute_error)) {
+               || RelativeError(memLatencyNs) >= target_relative_error))
+    {
         idx = arr[idx].i0; //avoid prefetching shenanigans
-        sw.Restart();
-        for (var i = 0; i < innerLoopLength; i++) {
+        var start = Stopwatch.GetTimestamp();
+        for (var i = 0; i < innerLoopLength; i++)
+        {
             idx = arr[idx].i0;
         }
-        memLatencyNs = memLatencyNs.Add(sw.Elapsed.TotalNanoseconds / innerLoopLength);
+        var end = Stopwatch.GetTimestamp();
+
+        memLatencyNs = memLatencyNs.Add((end - start) * nsPerTickPerLoop);
     }
     return (memLatencyNs, idx);
 }
@@ -136,6 +153,18 @@ static double StdError(MeanVarianceAccumulator acc)
     => acc.SampleStandardDeviation / Math.Sqrt(acc.WeightSum);
 static double RelativeError(MeanVarianceAccumulator acc)
     => StdError(acc) / acc.Mean;
+
+static void ExtendRandomCycle(payload_64byte[] payload64Bytes, int oldLength, long targetLength)
+{
+    var random = Random.Shared;
+
+    for (; oldLength < targetLength; oldLength++)
+    {
+        var swapWith = random.Next(oldLength);
+        payload64Bytes[oldLength].i0 = payload64Bytes[swapWith].i0;
+        payload64Bytes[swapWith].i0 = oldLength;
+    }
+}
 
 struct payload_64byte
 {
