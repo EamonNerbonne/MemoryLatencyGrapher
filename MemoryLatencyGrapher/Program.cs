@@ -60,14 +60,14 @@ var results = new List<LatencyResult>();
 
 for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++) {
     var length = 1;
-    long idx = 0;
-    arr[0].v0 = 0;
+    var idx = 0;
+    arr[0].i0 = 0;
     for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
         var target = arraySizes[currentIter];
         for (; length < target; length++) {
             var swapWith = rnd.Next(length);
-            arr[length].v0 = arr[swapWith].v0;
-            arr[swapWith].v0 = length;
+            arr[length].i0 = arr[swapWith].i0;
+            arr[swapWith].i0 = length;
         }
 
         var (memLatencyNs, nextIdx) = RunTest((int)target, sw, arr, idx);
@@ -113,18 +113,19 @@ using var jsonStream = File.OpenWrite(basename + ".json");
 JsonSerializer.Serialize(jsonStream, results.ToArray(), ResultJsonSerializerContext.Default.LatencyResultArray);
 return;
 
-static (MeanVarianceAccumulator memLatencyNs, long idx) RunTest(int length, Stopwatch sw, payload_64byte[] arr, long idx)
+static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Stopwatch sw, payload_64byte[] arr, int init_idx)
 {
     var memLatencyNs = MeanVarianceAccumulator.Empty;
     var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(payloadCount) - Math.Log(length)) * 20);
+    var idx=init_idx;
     while (memLatencyNs.WeightSum < maxTestingCountPerSize
            && (memLatencyNs.WeightSum < netMinTestingCount
                || RelativeError(memLatencyNs) >= target_relative_error
                || StdError(memLatencyNs) >= target_absolute_error)) {
-        idx = arr[idx].v0; //avoid prefetching shenanigans
+        idx = arr[idx].i0; //avoid prefetching shenanigans
         sw.Restart();
         for (var i = 0; i < innerLoopLength; i++) {
-            idx = arr[idx].v0;
+            idx = arr[idx].i0;
         }
         memLatencyNs = memLatencyNs.Add(sw.Elapsed.TotalNanoseconds / innerLoopLength);
     }
@@ -137,8 +138,9 @@ static double RelativeError(MeanVarianceAccumulator acc)
 
 struct payload_64byte
 {
-    public long v0;
+    public int i0;
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-    public long v1, v2, v3, v4, v5, v6, v7;
+    public int i1;
+    public long L1, L2, L3, L4, L5, L6, L7;
 #pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
 }
