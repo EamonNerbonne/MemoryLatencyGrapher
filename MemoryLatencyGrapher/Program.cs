@@ -113,6 +113,7 @@ using var jsonStream = File.OpenWrite(basename + ".json");
 JsonSerializer.Serialize(jsonStream, results.ToArray(), ResultJsonSerializerContext.Default.LatencyResultArray);
 return;
 
+[MethodImpl(MethodImplOptions.AggressiveOptimization|MethodImplOptions.NoInlining)]
 static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Stopwatch sw, payload_64byte[] arr, int init_idx)
 {
     var memLatencyNs = MeanVarianceAccumulator.Empty;
