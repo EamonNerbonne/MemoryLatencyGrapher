@@ -43,8 +43,9 @@ IEnumerable<long> ArraySizes() {
         yield return target;
     }
 }
+
 var arraySizes = ArraySizes().ToArray();
-var distributions = arraySizes.Select(_=>MeanVarianceAccumulator.Empty).ToArray();
+var distributions = arraySizes.Select(_ => MeanVarianceAccumulator.Empty).ToArray();
 var results = new List<LatencyResult>();
 
 for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++) {
@@ -74,7 +75,6 @@ for (var currentIter = 0; currentIter < arraySizes.Length; currentIter++) {
     results.Add(result);
     Log($"{result.MemorySizeInBytes} bytes: {result.latency_ns:f2}ns +/- {result.latency_stderr_ns:f4}     (final result for this size)");
 }
-
 
 var Ymax = results.Select(r => r.Y_plus2stderr).Max();
 var Ymin = Math.Max(0.1, results.Select(r => r.Y_min2stderr).Min());
