@@ -11,8 +11,8 @@ const long bytesPerPayload = 64;
 const long payloadCount = maxMemory / bytesPerPayload; //longs are 2^3 bytes
 const int shift = 2; // x-axis granularity; 0 is just factors of two, 1 is very rough, 4 is pretty detailed, 6 is probably beyond reasonable.
 const int innerLoopLength = 40_000;
-const int maxTestingCountPerSize = 800;
-const int minTestingCountPerSize = 5;
+const int maxTestingCountPerSize = 1000;
+const int minTestingCountPerSize = 4;
 const int outerLoopLength = 20; //how many times to run the inner loop before measuring the time
 const double target_relative_error = 0.03;
 
