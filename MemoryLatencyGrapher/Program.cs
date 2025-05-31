@@ -116,7 +116,7 @@ return;
 static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Stopwatch sw, payload_64byte[] arr, int init_idx)
 {
     var memLatencyNs = MeanVarianceAccumulator.Empty;
-    var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(payloadCount) - Math.Log(length)) * 20);
+    var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(payloadCount) - Math.Log(length)) * 3);
     var idx=init_idx;
     while (memLatencyNs.WeightSum < maxTestingCountPerSize
            && (memLatencyNs.WeightSum < netMinTestingCount
