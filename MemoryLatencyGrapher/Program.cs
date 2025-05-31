@@ -28,7 +28,6 @@ var arr = new long[maxLong];
 var rnd = Random.Shared;
 var sw = new Stopwatch();
 
-var results = new List<LatencyResult>();
 try {
     using (var proc = Process.GetCurrentProcess())
         proc.PriorityClass = ProcessPriorityClass.RealTime;
@@ -46,6 +45,7 @@ IEnumerable<long> ArraySizes() {
 }
 var arraySizes = ArraySizes().ToArray();
 var distributions = arraySizes.Select(_=>MeanVarianceAccumulator.Empty).ToArray();
+var results = new List<LatencyResult>();
 
 for (var outerLoopIdx = 0; outerLoopIdx < outerLoopLength; outerLoopIdx++) {
     var length = 1;
