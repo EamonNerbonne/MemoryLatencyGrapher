@@ -55,7 +55,7 @@ static LatencyResult[] DoBenchmark(LatencyTestOptions latencyTestOptions, Action
     var arr = new payload_64byte[latencyTestOptions.MaxMemoryInBytes / bytesPerPayload];
     IEnumerable<int> ArraySizes()
     {
-        for (var target = Math.Max(1L << latencyTestOptions.MemorySizeGranularity, 2048 / bytesPerPayload); target < arr.Length; target += target >> latencyTestOptions.MemorySizeGranularity) {
+        for (var target = Math.Max(1L << latencyTestOptions.MemorySizeGranularity, 2048 / bytesPerPayload); target <= arr.Length; target += target >> latencyTestOptions.MemorySizeGranularity) {
             yield return (int)target;
         }
     }
