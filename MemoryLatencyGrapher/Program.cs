@@ -29,11 +29,14 @@ var rnd = Random.Shared;
 var sw = new Stopwatch();
 
 var results = new List<LatencyResult>();
-using (var proc = Process.GetCurrentProcess())
-    proc.PriorityClass = ProcessPriorityClass.RealTime;
+try {
+    using (var proc = Process.GetCurrentProcess())
+        proc.PriorityClass = ProcessPriorityClass.RealTime;
 
-Thread.CurrentThread.Priority = ThreadPriority.Highest;
-
+    Thread.CurrentThread.Priority = ThreadPriority.Highest;
+} catch (Exception e) {
+    Log("Unable to raise process priority. You may get more accurate results if you run this with increased priviledges (i.e. sudo).  Detailed message:" + e.Message);
+}
 
 _ = RunTest(1, sw, arr, 0);
 IEnumerable<long> ArraySizes() {
