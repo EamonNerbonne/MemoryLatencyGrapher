@@ -5,4 +5,4 @@ namespace MemoryLatencyGrapher;
 [JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(LatencyResult))]
 [JsonSerializable(typeof(LatencyResult[]))]
-public partial class ResultJsonSerializerContext : JsonSerializerContext { }
+public sealed partial class ResultJsonSerializerContext : JsonSerializerContext { }
