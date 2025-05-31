@@ -127,24 +127,23 @@ JsonSerializer.Serialize(jsonStream, results.ToArray(), ResultJsonSerializerCont
 return;
 
 [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.NoInlining)]
-static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Span<payload_64byte> arr, int init_idx)
+static (MeanVarianceAccumulator memLatencyNs, int idx) RunTest(int length, Span<payload_64byte> arr, int idx)
 {
     var memLatencyNs = MeanVarianceAccumulator.Empty;
     var netMinTestingCount = (int)(minTestingCountPerSize + (Math.Log(payloadCount) - Math.Log(length)) * 4);
-    var idx = init_idx;
     var nsPerTickPerLoop = 1000_000_000.0 / ((double)innerLoopLength * Stopwatch.Frequency);
     while (memLatencyNs.WeightSum < maxTestingCountPerSize
            && (memLatencyNs.WeightSum < netMinTestingCount
                || RelativeError(memLatencyNs) >= target_relative_error))
     {
-        idx = arr[idx].i0; //avoid prefetching shenanigans
+        //avoid prefetching shenanigans:
+        idx = arr[idx].i0;
         var start = Stopwatch.GetTimestamp();
         for (var i = 0; i < innerLoopLength; i++)
         {
             idx = arr[idx].i0;
         }
         var end = Stopwatch.GetTimestamp();
-
         memLatencyNs = memLatencyNs.Add((end - start) * nsPerTickPerLoop);
     }
     return (memLatencyNs, idx);
