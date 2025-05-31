@@ -13,4 +13,7 @@ public sealed record LatencyResult(long MemorySizeInBytes, double latency_ns, do
 
     public double Y
         => latency_ns * 1000.0;
+
+    public string Summarize()
+        => $"{MemorySizeInBytes,10} bytes: {latency_ns,5:f2}ns +/- {latency_stderr_ns,5:f4}; {latency_stderr_ns / latency_ns * 100,4:f1}% after {TrialCount:f0} runs";
 }
