@@ -41,7 +41,14 @@ public sealed record LatencyTestOptions
             coordinateSystem: system
         ).Render();
         renderedPlot.SaveAsSVG(svgFileName);
-        Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = "\"" + svgFileName + "\"" });
+
+        if (OperatingSystem.IsWindows()) {
+            Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = "\"" + svgFileName + "\"" });
+        } else if (OperatingSystem.IsMacOS()) {
+            Process.Start(new ProcessStartInfo("open") { Arguments = $"\"{svgFileName}\"" });
+        } else if (OperatingSystem.IsLinux()) {
+            Process.Start(new ProcessStartInfo("xdg-open") { Arguments = $"\"{svgFileName}\"" });
+        }
     }
 
     public void SaveResultsToJson(LatencyResult[] latencyResults, string jsonFileName)
